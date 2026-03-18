@@ -260,20 +260,150 @@ Click on **Debug and simulate** using simulation as shown below.
 
 # STM32 CUBE PROGRAM
 
+### lcd.h
+
 ```c
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-...
-(Program remains exactly the same as provided)
-...
-#endif /* USE_FULL_ASSERT */
+#ifndef __LCD_H
+#define __LCD_H
+
+#include "stm32f1xx_hal.h"  // change based on MCU
+
+void LCD_Init(void);
+void LCD_Send_Command(uint8_t cmd);
+void LCD_Send_Data(uint8_t data);
+void LCD_Send_String(char *str);
+void LCD_Set_Cursor(uint8_t row, uint8_t col);
+
+#endif
 ```
 
 ---
+
+### lcd.c
+
+```c
+#include "lcd.h"
+
+// Pin definitions
+#define RS_PIN GPIO_PIN_0
+#define EN_PIN GPIO_PIN_1
+#define D4_PIN GPIO_PIN_2
+#define D5_PIN GPIO_PIN_3
+#define D6_PIN GPIO_PIN_4
+#define D7_PIN GPIO_PIN_5
+
+#define LCD_PORT GPIOA
+
+void LCD_Enable_Pulse()
+{
+    HAL_GPIO_WritePin(LCD_PORT, EN_PIN, GPIO_PIN_SET);
+    HAL_Delay(1);
+    HAL_GPIO_WritePin(LCD_PORT, EN_PIN, GPIO_PIN_RESET);
+    HAL_Delay(1);
+}
+
+void LCD_Send_4Bits(uint8_t data)
+{
+    HAL_GPIO_WritePin(LCD_PORT, D4_PIN, (data & 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LCD_PORT, D5_PIN, (data & 0x02) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LCD_PORT, D6_PIN, (data & 0x04) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LCD_PORT, D7_PIN, (data & 0x08) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void LCD_Send_Command(uint8_t cmd)
+{
+    HAL_GPIO_WritePin(LCD_PORT, RS_PIN, GPIO_PIN_RESET);
+
+    LCD_Send_4Bits(cmd >> 4);
+    LCD_Enable_Pulse();
+
+    LCD_Send_4Bits(cmd & 0x0F);
+    LCD_Enable_Pulse();
+
+    HAL_Delay(2);
+}
+
+void LCD_Send_Data(uint8_t data)
+{
+    HAL_GPIO_WritePin(LCD_PORT, RS_PIN, GPIO_PIN_SET);
+
+    LCD_Send_4Bits(data >> 4);
+    LCD_Enable_Pulse();
+
+    LCD_Send_4Bits(data & 0x0F);
+    LCD_Enable_Pulse();
+
+    HAL_Delay(2);
+}
+
+void LCD_Send_String(char *str)
+{
+    while (*str) LCD_Send_Data(*str++);
+}
+
+void LCD_Set_Cursor(uint8_t row, uint8_t col)
+{
+    uint8_t addr = (row == 0) ? 0x80 + col : 0xC0 + col;
+    LCD_Send_Command(addr);
+}
+
+void LCD_Init()
+{
+    HAL_Delay(50);
+
+    LCD_Send_4Bits(0x03);
+    LCD_Enable_Pulse();
+    HAL_Delay(5);
+
+    LCD_Send_4Bits(0x03);
+    LCD_Enable_Pulse();
+    HAL_Delay(1);
+
+    LCD_Send_4Bits(0x03);
+    LCD_Enable_Pulse();
+
+    LCD_Send_4Bits(0x02); // 4-bit mode
+    LCD_Enable_Pulse();
+
+    LCD_Send_Command(0x28); // 4-bit, 2 line
+    LCD_Send_Command(0x0C); // display ON
+    LCD_Send_Command(0x06); // entry mode
+    LCD_Send_Command(0x01); // clear
+    HAL_Delay(2);
+}
+```
+
+---
+
+## 4. main.c (Application)
+
+```c
+#include "main.h"
+#include "lcd.h"
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    LCD_Init();
+
+    LCD_Set_Cursor(0, 0);
+    LCD_Send_String("Hello STM32");
+
+    LCD_Set_Cursor(1, 0);
+    LCD_Send_String("16x2 LCD");
+
+    while (1)
+    {
+    }
+}
+```
+
+---
+
+
 
 # Output Screen Shots of Proteus
 
